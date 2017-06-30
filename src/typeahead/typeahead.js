@@ -189,6 +189,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
 
     var resetMatches = function() {
+      console.log('resetMatches: ');
       scope.matches = [];
       scope.activeIdx = -1;
       element.attr('aria-expanded', false);
@@ -218,6 +219,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
 
     var getMatchesAsync = function(inputValue, evt) {
+      console.log('getMatchesAsync: ', inputValue);
       var locals = {$viewValue: inputValue};
       isLoadingSetter(originalScope, true);
       isNoResultsSetter(originalScope, false);
@@ -357,14 +359,20 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       modelCtrl.$setValidity('editable', true);
       modelCtrl.$setValidity('parse', true);
 
-      onSelectCallback(originalScope, {
+      var isNotSelected = onSelectCallback(originalScope, {
         $item: item,
         $model: model,
         $label: parserResult.viewMapper(originalScope, locals),
         $event: evt
       });
 
-      resetMatches();
+      if (!isNotSelected) {
+        console.log('before resetMatches call');
+        resetMatches();
+      } else {
+        console.log('keep open');
+      }
+
 
       //return focus to the input element if a match was selected via a mouse click event
       // use timeout to avoid $rootScope:inprog error
@@ -375,6 +383,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
     //bind keyboard events: arrows up(38) / down(40), enter(13) and tab(9), esc(27)
     element.on('keydown', function(evt) {
+      console.log('on key down');
       //typeahead is open and an "interesting" key was pressed
       if (scope.matches.length === 0 || HOT_KEYS.indexOf(evt.which) === -1) {
         return;
@@ -467,14 +476,24 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
     // Keep reference to click handler to unbind it.
     var dismissClickHandler = function(evt) {
+      console.log('dismissClickHandler: ');
+      var popupElem = document.getElementById(popupId);
+      var keepOpen = scope.$eval(attrs.typeaheadKeepOpenOnSelect);
+      
       // Issue #3973
       // Firefox treats right click as a click on document
-      if (element[0] !== evt.target && evt.which !== 3 && scope.matches.length !== 0) {
+      if (element[0] !== evt.target && 
+        !(keepOpen && (evt.target == popupElem || popupElem.contains(evt.target))) && 
+        evt.which !== 3 && 
+        scope.matches.length !== 0
+      ) {
+        console.log('dismissClickHandler__reset: ', element[0], evt.target);
         resetMatches();
         if (!$rootScope.$$phase) {
           originalScope.$digest();
         }
       }
+      return true;
     };
 
     $document.on('click', dismissClickHandler);
