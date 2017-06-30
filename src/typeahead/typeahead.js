@@ -121,6 +121,7 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
     // WAI-ARIA
     var popupId = 'typeahead-' + scope.$id + '-' + Math.floor(Math.random() * 10000);
+    var allResultsBtnId = 'uib-typeahead-all-results-option';
     element.attr({
       'aria-autocomplete': 'list',
       'aria-expanded': false,
@@ -189,7 +190,6 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
 
     var resetMatches = function() {
-      console.log('resetMatches: ');
       scope.matches = [];
       scope.activeIdx = -1;
       element.attr('aria-expanded', false);
@@ -219,7 +219,6 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
     };
 
     var getMatchesAsync = function(inputValue, evt) {
-      console.log('getMatchesAsync: ', inputValue);
       var locals = {$viewValue: inputValue};
       isLoadingSetter(originalScope, true);
       isNoResultsSetter(originalScope, false);
@@ -359,20 +358,17 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       modelCtrl.$setValidity('editable', true);
       modelCtrl.$setValidity('parse', true);
 
-      var isNotSelected = onSelectCallback(originalScope, {
+      // negative naming just for backward compability (for places where selectCallback doesn't return any value, so it is falthy)
+      var shouldNotResetMatches = onSelectCallback(originalScope, {
         $item: item,
         $model: model,
         $label: parserResult.viewMapper(originalScope, locals),
         $event: evt
       });
 
-      if (!isNotSelected) {
-        console.log('before resetMatches call');
+      if (!shouldNotResetMatches) {
         resetMatches();
-      } else {
-        console.log('keep open');
       }
-
 
       //return focus to the input element if a match was selected via a mouse click event
       // use timeout to avoid $rootScope:inprog error
@@ -383,7 +379,6 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
     //bind keyboard events: arrows up(38) / down(40), enter(13) and tab(9), esc(27)
     element.on('keydown', function(evt) {
-      console.log('on key down');
       //typeahead is open and an "interesting" key was pressed
       if (scope.matches.length === 0 || HOT_KEYS.indexOf(evt.which) === -1) {
         return;
@@ -476,18 +471,15 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
 
     // Keep reference to click handler to unbind it.
     var dismissClickHandler = function(evt) {
-      console.log('dismissClickHandler: ');
       var popupElem = document.getElementById(popupId);
-      var keepOpen = scope.$eval(attrs.typeaheadKeepOpenOnSelect);
       
       // Issue #3973
       // Firefox treats right click as a click on document
       if (element[0] !== evt.target && 
-        !(keepOpen && (evt.target == popupElem || popupElem.contains(evt.target))) && 
+        !shouldKeepOpen(evt.target, popupElem) && 
         evt.which !== 3 && 
         scope.matches.length !== 0
       ) {
-        console.log('dismissClickHandler__reset: ', element[0], evt.target);
         resetMatches();
         if (!$rootScope.$$phase) {
           originalScope.$digest();
@@ -495,6 +487,19 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.debounce', 'ui.bootstrap
       }
       return true;
     };
+
+    function shouldKeepOpen(evtTarget, popupElem) {
+      if(belongsToAllResultsBtn(evtTarget)) {
+        return false;
+      }
+      var keepOpen = scope.$eval(attrs.typeaheadKeepOpenOnSelect);
+      return keepOpen && popupElem && (evtTarget == popupElem || popupElem.contains(evtTarget));
+    }
+
+    function belongsToAllResultsBtn(evtTarget) {
+      var allResultsBtnElem = document.getElementById(allResultsBtnId);
+      return allResultsBtnElem == evtTarget || allResultsBtnElem.contains(evtTarget)
+    }
 
     $document.on('click', dismissClickHandler);
 
